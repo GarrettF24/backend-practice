@@ -6,67 +6,60 @@
 
 import express from "express"
 import logger from "morgan"
-
-import db from "./db/connection"
-import Recipe from "./models/recipe"
-
-// import { createRequire } from "module"
-// const require = createRequire(import.meta.url)
-
-// const recipe_file = require("./recipes.json")
+import { createRequire } from "module"
+const require = createRequire(import.meta.url)
+const recipe_file = require("./recipes.json")
 const app = express()
 const PORT = process.env.PORT || 3000
 
-// const recipes = recipe_file.recipes
+const recipes = recipe_file.recipes
 
 app.use(express.json())
 app.use(logger("dev"))
 
-db.on("connected", () => {
-  console.log("Connected to MongoDB")
-  app.listen(PORT, () => {
-    console.log(`server running on port ${PORT}`)
+app.listen(PORT, () => {
+  console.log(`server running on port ${PORT}`)
+})
+
+app.get("/", (req, res) => {
+  res.json(recipe_file)
+})
+
+app.get("/recipes", (req, res) => {
+  const recipeNames = {
+    recipeNames: recipe_file.recipes.map((recipe) => recipe.name),
+  }
+  res.json(recipeNames)
+})
+
+app.get("/recipes/details/:id", (req, res) => {
+  const id = req.params.id
+  const recipe = recipes.find((recipe) => recipe.name === id)
+  res.json({
+    details: {
+      ingredients: recipe.ingredients,
+      numOfSteps: recipe.instructions.length,
+    },
   })
 })
 
-app.get("/", (req, res) => res.send("This is the root"))
-
-app.get("/recipes", async (req, res) => {
-  try {
-    const recipes = await Recipe.find()
-    res.json(recipes)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ error: error.message })
-  }
+app.post("/", (req, res) => {
+  const recipe = req.body
+  recipes.push(recipe)
+  res.json(recipes)
 })
 
-app.get("/recipes/:id", async (req, res) => {
-  try {
-    const id = req.params
-    const recipe = await Recipe.findById(id)
-    res.json(recipe)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ error: error.message })
-  }
+app.put("/recipes/:id", (req, res) => {
+  const id = req.params.id
+  const recipeIndex = recipes.findIndex((recipe) => recipe.name === id)
+  const recipe = { ...recipes[recipeIndex], ...req.body }
+  recipes.splice(recipeIndex, 1, recipe)
+  res.json(recipe)
 })
 
-app.post("/recipes", async (req, res) => {
-  try {
-    const recipe = new Recipe(req.body)
-    await recipe.save()
-    res.status(201).json(recipe)
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({ error: error.message })
-  }
+app.delete("/recipes/:id", (req, res) => {
+  const id = req.params.id
+  const recipeIndex = recipes.findIndex((recipe) => recipe.name === id)
+  recipes.splice(recipeIndex, 1)
+  res.json()
 })
-
-app.put("/recipes/:id", async (req, res) => {
-  const { id } = req.params
-  const recipe = await Recipe.findByIdAndUpdate(id, req.body, { new: true })
-  res.status(200).json(recipe)
-})
-
-app.delete()
